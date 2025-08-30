@@ -1,10 +1,11 @@
 use clap::{Parser, Subcommand};
-use clap_complete::{Shell, generate};
-use self_update;
+use clap_complete::{generate, Shell};
 use std::io;
 
+const APP_VERSION: &str = env!("JJ_VERSION");
+
 #[derive(Parser)]
-#[command(author, version, about, long_about = None)]
+#[command(author, version = APP_VERSION, about, long_about = None)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -79,7 +80,7 @@ fn check_for_updates() {
 }
 
 fn update(preview: bool) -> Result<(), Box<dyn ::std::error::Error>> {
-    let current_version = self_update::cargo_crate_version!();
+    let current_version = APP_VERSION;
     println!("Current version: {}", current_version);
 
     let mut updater = self_update::backends::github::Update::configure();
