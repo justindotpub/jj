@@ -25,7 +25,11 @@ enum Commands {
         shell: Shell,
     },
     /// Update the CLI to the latest version
-    Update,
+    Update {
+        /// Use the preview channel (tagged `preview`)
+        #[arg(long)]
+        preview: bool,
+    },
 }
 
 fn main() {
@@ -42,8 +46,8 @@ fn main() {
         Commands::Generate { shell } => {
             generate_completions(*shell);
         }
-        Commands::Update => {
-            if let Err(e) = update() {
+        Commands::Update { preview } => {
+            if let Err(e) = update(*preview) {
                 println!("Error updating: {}", e);
             }
         }
@@ -74,18 +78,25 @@ fn check_for_updates() {
     });
 }
 
-fn update() -> Result<(), Box<dyn ::std::error::Error>> {
+fn update(preview: bool) -> Result<(), Box<dyn ::std::error::Error>> {
     let current_version = self_update::cargo_crate_version!();
     println!("Current version: {}", current_version);
 
-    let status = self_update::backends::github::Update::configure()
+    let mut updater = self_update::backends::github::Update::configure();
+    updater
         .repo_owner("justindotpub")
         .repo_name("jj")
         .bin_name("jj")
         .show_download_progress(true)
-        .current_version(current_version)
-        .build()?
-        .update()?;
+        .current_version(current_version);
+
+    // When --preview is set, target the moving `preview` tag
+    // to fetch the latest prerelease binaries.
+    if preview {
+        updater.target_version_tag("preview");
+    }
+
+    let status = updater.build()?.update()?;
 
     match status {
         self_update::Status::UpToDate(v) => {
