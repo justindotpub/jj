@@ -59,7 +59,7 @@ fn generate_completions(shell: Shell) {
 fn check_for_updates() {
     std::thread::spawn(move || {
         if let Ok(status) = self_update::backends::github::Update::configure()
-            .repo_owner("justin")
+            .repo_owner("justindotpub")
             .repo_name("jj")
             .bin_name("jj")
             .current_version(self_update::cargo_crate_version!())
@@ -75,14 +75,25 @@ fn check_for_updates() {
 }
 
 fn update() -> Result<(), Box<dyn ::std::error::Error>> {
+    let current_version = self_update::cargo_crate_version!();
+    println!("Current version: {}", current_version);
+
     let status = self_update::backends::github::Update::configure()
         .repo_owner("justindotpub")
         .repo_name("jj")
         .bin_name("jj")
         .show_download_progress(true)
-        .current_version(self_update::cargo_crate_version!())
+        .current_version(current_version)
         .build()?
         .update()?;
-    println!("Update status: `{}`!", status.version());
+
+    match status {
+        self_update::Status::UpToDate(v) => {
+            println!("Already up to date with version {}", v);
+        }
+        self_update::Status::Updated(v) => {
+            println!("Successfully updated to version {}", v);
+        }
+    }
     Ok(())
 }
