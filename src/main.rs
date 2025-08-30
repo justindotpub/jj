@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
-use clap_complete::{generate, Shell};
-use std::io;
+use clap_complete::{Shell, generate};
 use self_update;
+use std::io;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -76,7 +76,7 @@ fn check_for_updates() {
 
 fn update() -> Result<(), Box<dyn ::std::error::Error>> {
     let status = self_update::backends::github::Update::configure()
-        .repo_owner("justin")
+        .repo_owner("justindotpub")
         .repo_name("jj")
         .bin_name("jj")
         .show_download_progress(true)
