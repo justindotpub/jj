@@ -15,7 +15,7 @@ OUT_DIR ?= completions
 .DEFAULT_GOAL := help
 
 help: ## Show this help.
-	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $1, $2}'
 
 build: ## Build debug binary
 	$(CARGO) build
@@ -59,31 +59,35 @@ ci: ## Run checks used in CI (fmt-check, clippy, test)
 	$(MAKE) clippy
 	$(MAKE) test
 
-bump: ## Bump crate version (default: next patch; override with VERSION=X.Y.Z)
+bump: ## Bump crate version, commit, push, and tag (default: patch; override with VERSION=X.Y.Z)
 	@set -e; \
-	if [ -n "$(VERSION)" ]; then \
-		echo "Bumping version to $(VERSION)"; \
-		if command -v cargo-set-version >/dev/null 2>&1; then \
-			$(CARGO) set-version $(VERSION); \
-		else \
-			echo "cargo-edit not found; applying fallback edit to Cargo.toml"; \
-			sed 's/^version = "[^"]*"/version = "$(VERSION)"/' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml; \
-		fi; \
+	if [ -z "$(VERSION)" ]; then \
+		cur=$$(grep '^version = ' Cargo.toml | sed 's/.*version = "\([^"\\]*\)".*/\1/'); \
+		[ -n "$$cur" ] || { echo "Could not parse current version" >&2; exit 1; }; \
+		major=$${cur%%.*}; rest=$${cur#*.}; minor=$${rest%%.*}; patch=$${rest#*.}; \
+		case "$$major.$$minor.$$patch" in \
+			*[^0-9.]*|\" ) echo "Could not parse current version: '$$cur'" >&2; exit 1 ;; \
+		esac; \
+		new_patch=$$((patch + 1)); \
+		NEW_VER="$$major.$$minor.$$new_patch"; \
+		echo "VERSION not provided; bumping to next patch: $$NEW_VER"; \
 	else \
-		echo "VERSION not provided; defaulting to next patch"; \
-		if command -v cargo-set-version >/dev/null 2>&1; then \
-			$(CARGO) set-version --bump patch; \
-		else \
-			cur=$$(grep '^version = ' Cargo.toml | sed 's/.*version = "\([^"]*\)".*/\1/'); \
-			[ -n "$$cur" ] || { echo "Could not parse current version" >&2; exit 1; }; \
-			major=$${cur%%.*}; rest=$${cur#*.}; minor=$${rest%%.*}; patch=$${rest#*.}; \
-			case "$$major.$$minor.$$patch" in \
-				*[^0-9.]*|"" ) echo "Could not parse current version: '$$cur'" >&2; exit 1 ;; \
-			esac; \
-			new_patch=$$((patch + 1)); \
-			new_ver="$$major.$$minor.$$new_patch"; \
-			echo "Bumping version to $$new_ver"; \
-			sed 's/^version = "[^"]*"/version = "'"$$new_ver"'"/' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml; \
-		fi; \
+		NEW_VER="$(VERSION)"; \
+		echo "Bumping to specified version: $(VERSION)"; \
 	fi; \
-	echo "Done. Remember to update CHANGELOG and tag release if needed."
+	if command -v cargo-set-version >/dev/null 2>&1; then \
+		$(CARGO) set-version $$NEW_VER; \
+	else \
+		echo "cargo-edit not found; using sed to update Cargo.toml"; \
+		sed -i.bak "s/^version = \"[^\"]*\"/version = \"$$NEW_VER\"/" Cargo.toml && rm Cargo.toml.bak; \
+	fi; \
+	echo "Updating Cargo.lock by building the project..."; \
+	$(CARGO) build; \
+	echo "Committing and pushing version bump..."; \
+	git add Cargo.toml Cargo.lock; \
+	git commit -m "release: v$$NEW_VER"; \
+	git push; \
+	echo "Tagging release and pushing tag..."; \
+	git tag -a "v$$NEW_VER" -m "release: v$$NEW_VER"; \
+	git push origin "v$$NEW_VER"; \
+	echo "Bump to v$$NEW_VER complete."
