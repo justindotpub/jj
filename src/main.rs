@@ -25,13 +25,12 @@ enum Commands {
         #[arg(long)]
         preview: bool,
     },
+    /// A command that prints a message
+    Run,
 }
 
 fn main() {
     let cli = Cli::parse();
-
-    // Check for updates in the background
-    check_for_updates();
 
     match &cli.command {
         Commands::Generate { shell } => {
@@ -42,29 +41,20 @@ fn main() {
                 println!("Error updating: {}", e);
             }
         }
+        Commands::Run => {
+            run();
+        }
     }
+}
+
+fn run() {
+    println!("ran");
 }
 
 fn generate_completions(shell: Shell) {
     let mut cmd = <Cli as clap::CommandFactory>::command();
     let cmd_name = cmd.get_name().to_string();
     generate(shell, &mut cmd, cmd_name, &mut io::stdout());
-}
-
-fn check_for_updates() {
-    std::thread::spawn(move || {
-        if let Ok(status) = self_update::backends::github::Update::configure()
-            .repo_owner("justindotpub")
-            .repo_name("jj")
-            .bin_name("jj")
-            .current_version(self_update::cargo_crate_version!())
-            .build()
-            .and_then(|u| u.update_extended())
-            && status.updated()
-        {
-            println!("A new version is available! Run `jj update` to install it.");
-        }
-    });
 }
 
 fn update(preview: bool) -> Result<(), Box<dyn ::std::error::Error>> {
