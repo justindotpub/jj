@@ -3,7 +3,10 @@ use std::process::Command;
 
 fn main() {
     let pkg_version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "0.0.0".into());
-    let is_preview = env::var("JJ_PREVIEW").ok().filter(|v| v != "0" && !v.is_empty()).is_some();
+    let is_preview = env::var("JJ_PREVIEW")
+        .ok()
+        .filter(|v| v != "0" && !v.is_empty())
+        .is_some();
 
     // Prefer CI-provided SHA, else try git, else unknown
     let sha = env::var("GITHUB_SHA")
@@ -23,7 +26,7 @@ fn main() {
 
 fn short_git_sha() -> Result<String, Box<dyn std::error::Error>> {
     let output = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"]) 
+        .args(["rev-parse", "--short", "HEAD"])
         .output()?;
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
@@ -31,4 +34,3 @@ fn short_git_sha() -> Result<String, Box<dyn std::error::Error>> {
         Err("git not available".into())
     }
 }
-

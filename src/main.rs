@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use clap_complete::{generate, Shell};
+use clap_complete::{Shell, generate};
 use std::io;
 
 const APP_VERSION: &str = env!("JJ_VERSION");
@@ -13,12 +13,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Says hello
-    Say {
-        /// The name to say hello to
-        #[arg(short, long)]
-        name: Option<String>,
-    },
     /// Generate shell completions
     Generate {
         /// The shell to generate for
@@ -40,10 +34,6 @@ fn main() {
     check_for_updates();
 
     match &cli.command {
-        Commands::Say { name } => {
-            let name = name.as_deref().unwrap_or("World");
-            println!("Hello, {}!", name);
-        }
         Commands::Generate { shell } => {
             generate_completions(*shell);
         }
@@ -69,12 +59,10 @@ fn check_for_updates() {
             .bin_name("jj")
             .current_version(self_update::cargo_crate_version!())
             .build()
+            .and_then(|u| u.update_extended())
+            && status.updated()
         {
-            if let Ok(status) = status.update_extended() {
-                if status.updated() {
-                    println!("A new version is available! Run `jj update` to install it.");
-                }
-            }
+            println!("A new version is available! Run `jj update` to install it.");
         }
     });
 }
@@ -84,12 +72,21 @@ fn update(preview: bool) -> Result<(), Box<dyn ::std::error::Error>> {
     println!("Current version: {}", current_version);
 
     let mut updater = self_update::backends::github::Update::configure();
+    // For preview channel, if we're already running a preview build,
+    // use the moving tag name for comparison so self_update can detect UpToDate.
+    let is_current_preview = current_version.contains("-preview");
+    let effective_current = if preview && is_current_preview {
+        "preview"
+    } else {
+        current_version
+    };
+
     updater
         .repo_owner("justindotpub")
         .repo_name("jj")
         .bin_name("jj")
         .show_download_progress(true)
-        .current_version(current_version);
+        .current_version(effective_current);
 
     // When --preview is set, target the moving `preview` tag
     // to fetch the latest prerelease binaries.
